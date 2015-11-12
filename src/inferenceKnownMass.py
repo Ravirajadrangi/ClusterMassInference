@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/u/ki/swmclau2/PYENV/bin/python
 #@Author Sean McLaughlin
 desc ='''
 This module will eventually become part of the larger Pangloss structure.
@@ -22,6 +22,9 @@ parser.add_argument('nSteps', metavar = 'nSteps', type = int, help =\
 parser.add_argument('nCores', metavar = 'nCores', type = int, help=\
                     'Number of cores to allow the sampler to use. Limited by machine maximum.')
 
+parser.add_argument('--noDisplay', metavar = 'noDisplay', action = 'store_true', help =\
+                    'If used, will assume the job is running on a machine with no display and will make adjustments.')
+
 args = parser.parse_args()
 
 nWalkers = args.nWalkers
@@ -43,13 +46,16 @@ from astropy.io import fits
 import numpy as np
 from scipy.stats import linregress, gamma
 import emcee as mc
-from corner import corner
+if args.noDisplay:
+    import matplotlib
+    matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import seaborn as sns
+from corner import corner
 sns.set()
 
-dataDir = '/home/sean/Data/BuzzardSims/'
-#dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
+#dataDir = '/home/sean/Data/BuzzardSims/'
+dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
 hdulist = fits.open(dataDir+'buzzard-v1.1-y5_run_00340_lambda_chisq.fit')
 data = hdulist[1].data
 
@@ -145,18 +151,26 @@ sampler.pool.terminate()#there's a bug in emcee that creates daemon threads. Thi
 del(sampler)
 
 MAP = chain.mean(axis = 0)
-print 'MAP'
-print MAP
-print 'OLS'
-print logA, b, err
+#print 'MAP'
+#print MAP
+#print 'OLS'
+#print logA, b, err
 
 titles = ['$a$', '$b$', '$\sigma$']
 sigma_true = 1 #just a guess so this will plot
 corner(chain, labels = titles , truths = [logA, b, sigma_true])
-plt.show()
+if args.noDisplay:
+    plt.savefig('corner.png')
+else:
+    plt.show()
 
 plt.scatter(logMass, logRich, alpha = .01)
 plt.plot(logMass, MAP[1]*logMass+MAP[0], label = 'MCMC')
 plt.plot(logMass, b*logMass+logA, label = 'OLS')
 plt.legend(loc= 'best')
-plt.show()
+if args.noDisplay:
+    plt.savefig('scatter.png')
+else:
+    plt.show()
+
+np.savetxt('chain.gz', chain)
