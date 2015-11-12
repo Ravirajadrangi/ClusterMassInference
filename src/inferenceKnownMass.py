@@ -132,14 +132,14 @@ for row in pos0:
     row[2] = sig_try
 
 sampler = mc.EnsembleSampler(nWalkers, ndim, log_posterior, args=[rich, mass],threads = nCores)
-nburn = nwalkers*10
+nBurn = int(nSteps/10)
 
 np.random.seed(0)#"random"
 print 'Running Sampler...'
 sampler.run_mcmc(pos0, nSteps)
 print 'Done Sampling'
 
-chain = sampler.flatchain[nburn:, :]
+chain = sampler.chain[:,nBurn:, :].reshape((-1,ndim))
 
 sampler.pool.terminate()#there's a bug in emcee that creates daemon threads. This kills them.
 del(sampler)
