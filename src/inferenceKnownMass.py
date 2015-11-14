@@ -22,7 +22,7 @@ parser.add_argument('nSteps', metavar = 'nSteps', type = int, help =\
 parser.add_argument('nCores', metavar = 'nCores', type = int, help=\
                     'Number of cores to allow the sampler to use. Limited by machine maximum.')
 
-parser.add_argument('--noDisplay', metavar = 'noDisplay', action = 'store_true', help =\
+parser.add_argument('--noDisplay', dest = 'noDisplay', action = 'store_true', help =\
                     'If used, will assume the job is running on a machine with no display and will make adjustments.')
 
 args = parser.parse_args()
@@ -54,8 +54,8 @@ import seaborn as sns
 from corner import corner
 sns.set()
 
-#dataDir = '/home/sean/Data/BuzzardSims/'
-dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
+dataDir = '/home/sean/Data/BuzzardSims/'
+#dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
 hdulist = fits.open(dataDir+'buzzard-v1.1-y5_run_00340_lambda_chisq.fit')
 data = hdulist[1].data
 
@@ -118,8 +118,8 @@ ndim = 3
 nwalkers = 1000
 
 #a_log_mean, a_log_spread = -5, 2
-a_mean, a_spread = -5, 2
-b_mean, b_spread = 1, .5
+a_mean, a_spread = logA, .5
+b_mean, b_spread = b, .2
 sigma_mean, sigma_spread = 1, .5
 
 pos0 = np.zeros((nwalkers, ndim))
