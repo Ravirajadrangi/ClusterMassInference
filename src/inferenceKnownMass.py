@@ -44,7 +44,7 @@ if nCores>maxCores:
 
 from astropy.io import fits
 import numpy as np
-from scipy.stats import linregress, gamma
+from scipy.stats import linregress, gamma, expon, lognorm
 import emcee as mc
 if args.noDisplay:
     import matplotlib
@@ -67,41 +67,45 @@ rich = rich[rich>0]#slice off null values
 logMass = np.log10(mass)
 logRich = np.log10(rich)
 
-b, logA, r, p, err = linregress(logMass, logRich)
+offset = 13.5
+
+b, logA, r, p, err = linregress(logMass-offset, logRich)
 
 def log_prior(a,b,sigma):
 
-    #if any(x<0 for x in (a,sigma)):
-    #    return -np.inf
-    if sigma<0:
+    if any(x<0 for x in (a,sigma)):
+    #if sigma<0:
         return - np.inf
     t = np.arctan(b)
-    if t<0 or t>np.pi/2:
+    #if t<0 or t>np.pi/2:
+    if t<-np.pi/2 or t>np.pi/2:
         return -np.inf
 
     #Hyperparameters
-    lambda_a = 1
+    lambda_a = 1.0
     sigma_a, sigma_b = 1,1
 
     p = 0
     #Exponential in log a
     #p+= np.log(lambda_a)-lambda_a*np.log(a)
-    p+= np.log(lambda_a)-lambda_a*a #changed a => logA TODO Change variable name?
+    #p+= np.log(lambda_a)-lambda_a*a #changed a => logA TODO Change variable name?
+    p+=expon.logpdf(np.log(a), scale = 1/lambda_a)
     #Uniform in arctan(b)
     p+=np.log(2/np.pi)
     #Inv Gamma for sigma
     p-= gamma.logpdf(sigma,sigma_a, scale = sigma_b)
     return p
 
-norms = {}
 def log_liklihood(rich, M, a,b,sigma):
     p = 0
 
     #p-= np.sum(((b*np.log(M)+np.log(a)-np.log(rich))**2)/(2*sigma**2)+np.log(sigma*rich))
     #redefine A to be intercept at center rather than 0
     #p-= np.sum(((b*(np.log(M)-13.5)+np.log(a)-np.log(rich))**2)/(2*sigma**2)+np.log(sigma*rich))
-    p-= np.sum(((b*np.log(M)+a-np.log(rich))**2)/(2*sigma**2)+np.log(sigma*rich))#See Above
+    #p-= np.sum(((b*np.log(M)+a-np.log(rich))**2)/(2*sigma**2)+np.log(sigma*rich))#See Above
     #p-= np.sum(((b*np.log(M-13.5)+a-np.log(rich))**2)/(2*sigma**2)+np.log(sigma*rich))#See Above
+
+    p+= np.sum(lognorm.logpdf(rich, sigma, loc = (b*(np.log(M)-offset)+np.log(a))))
 
     return p
 
@@ -114,15 +118,14 @@ def log_posterior(theta,rich, M):
     #print '-'*50
     return p
 
-ndim = 3
-nwalkers = 1000
+nDim = 3
 
 #a_log_mean, a_log_spread = -5, 2
-a_mean, a_spread = logA, .5
-b_mean, b_spread = b, .2
+a_mean, a_spread = 4, 1.5
+b_mean, b_spread = .5, .25
 sigma_mean, sigma_spread = 1, .5
 
-pos0 = np.zeros((nwalkers, ndim))
+pos0 = np.zeros((nWalkers, nDim))
 for row in pos0:
     #a,b,sigma,m
     #a_try = -1
@@ -137,24 +140,22 @@ for row in pos0:
         sig_try = sigma_mean+np.random.randn()*sigma_spread
     row[2] = sig_try
 
-sampler = mc.EnsembleSampler(nWalkers, ndim, log_posterior, args=[rich, mass],threads = nCores)
+sampler = mc.EnsembleSampler(nWalkers, nDim, log_posterior, args=[rich, mass],threads = nCores)
 nBurn = int(nSteps/10)
 
 np.random.seed(0)#"random"
-print 'Running Sampler...'
 sampler.run_mcmc(pos0, nSteps)
-print 'Done Sampling'
 
-chain = sampler.chain[:,nBurn:, :].reshape((-1,ndim))
+chain = sampler.chain[:,nBurn:, :].reshape((-1,nDim))
 
 sampler.pool.terminate()#there's a bug in emcee that creates daemon threads. This kills them.
 del(sampler)
 
 MAP = chain.mean(axis = 0)
-#print 'MAP'
-#print MAP
-#print 'OLS'
-#print logA, b, err
+print 'MAP'
+print MAP[:-1]
+print 'OLS'
+print logA, b
 
 titles = ['$a$', '$b$', '$\sigma$']
 sigma_true = 1 #just a guess so this will plot
@@ -173,4 +174,4 @@ if args.noDisplay:
 else:
     plt.show()
 
-np.savetxt('chain.gz', chain)
+np.savetxt('chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
