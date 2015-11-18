@@ -54,8 +54,8 @@ import seaborn as sns
 from corner import corner
 sns.set()
 
-dataDir = '/home/sean/Data/BuzzardSims/'
-#dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
+#dataDir = '/home/sean/Data/BuzzardSims/'
+dataDir = '/nfs/slac/g/ki/ki19/des/erykoff/clusters/mocks/Buzzard/buzzard-1.1/des_y5/redmapper_v6.4.7/halos/'
 hdulist = fits.open(dataDir+'buzzard-v1.1-y5_run_00340_lambda_chisq.fit')
 data = hdulist[1].data
 
