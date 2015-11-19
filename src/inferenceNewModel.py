@@ -23,8 +23,8 @@ parser.add_argument('nSteps', metavar = 'nSteps', type = int, help =\
 parser.add_argument('nCores', metavar = 'nCores', type = int, help=\
                     'Number of cores to allow the sampler to use. Limited by machine maximum.')
 
-parser.add_argument('--noDisplay', dest = 'noDisplay', action = 'store_true', help =\
-                    'If used, will assume the job is running on a machine with no display and will make adjustments.')
+#parser.add_argument('--noDisplay', dest = 'noDisplay', action = 'store_true', help =\
+#                    'If used, will assume the job is running on a machine with no display and will make adjustments.')
 
 args = parser.parse_args()
 
@@ -66,8 +66,7 @@ a_true, b_true = 0.842, -0.03
 B_l_true = 0.642
 sigma_l_true = 0.184
 
-def _A_lam(a, b, z):
-    return a*pow((1+z)/1.3, b)
+_A_lam = lambda a, b, z : a*pow((1+z)/1.3, b)
 
 #forward model
 def logLam(logL0, a, b, B_l, M, z):
@@ -186,7 +185,8 @@ chain = sampler.chain[:,nburn:, :].reshape((-1, ndim))
 sampler.pool.terminate()#there's a bug in emcee that creates daemon threads. This kills them.
 del(sampler)
 
-MAP = chain.mean(axis = 0)
+MAP = chain[:, :5].mean(axis = 0)
+print MAP
 labels = ['logL0', 'a', 'b','B_l','sigma']
 print '\tMCMC\tTrue'
 for label, val, truth in zip(labels, MAP, [logL0_true, a_true, b_true, B_l_true, sigma_l_true]):
