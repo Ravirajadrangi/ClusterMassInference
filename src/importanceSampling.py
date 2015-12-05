@@ -232,4 +232,4 @@ print '\tMCMC\tTrue'
 for label, val, truth in zip(labels, MAP, [logL0_true, a_true, b_true, B_l_true, sigma_l_true]):
     print '%s:\t%.3f\t%.3f'%(label, val, truth)
 
-#np.savetxt('chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
+np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
