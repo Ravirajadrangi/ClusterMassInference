@@ -51,8 +51,10 @@ if nCores>maxCores:
     nCores = maxCores
 
 import numpy as np
-from scipy.stats import linregress, gamma, expon, norm
+from scipy.stats import linregress, gamma, expon, norm, t
 import emcee as mc
+from scipy.misc import logsumexp
+from itertools import izip
 
 np.random.seed(0)
 
@@ -68,7 +70,6 @@ vals['B3'] = [0.40, 0.73]
 
 #interpolates naively between the points given in the original paper
 z_params = {}
-from scipy.stats import linregress
 for key, val in vals.iteritems():
     slope, intercept, r, p, stderr = linregress(z, val)
     z_params[key] = (slope, intercept)
@@ -165,31 +166,39 @@ def invLogLam(logL0, a, b, B_l, z, logRich):
 #TODO Make this one synonymous with it non-inverse version
 #TODO Consider checking if logRich is a vector or a number, and acting accodingly.
 def invLogLamSample(logLam0, a, b, B_lam,sigma_mass, z,logRich, size = 100):
+    #NOTE Returns ln(M), not log10(M)! This is how the formula is defined!
     mu = invLogLam(logLam0, a, b, B_lam, z, logRich)
-    #return mv_norm.rvs(mean = mu, cov = sigma_mass*np.identity(logRich.shape[0]), size =  size).T#(logRich.shape[0], size)
-    return norm.rvs(loc = mu, scale = sigma_mass, size =  size)#( size,)
+    if sigma_mass == 0:
+        return mu
+    return np.array([norm.rvs(loc = m, scale = sigma_mass, size =  size)\
+                    for m in mu])#(logRich.shape[0], size)
 
-from scipy.misc import logsumexp
+sigma_mass = 1 #TODO idk what this should be; i suppose it's my discretion
+df = 1
+#draw one set of samples, rather than re-drawing each cycle
+#use truths as really really good guess. Can relax later.
+logMassSamples = invLogLamSample(logL0_true, a_true, b_true, B_l_true,sigma_mass, redshift, logRichness, size = nSamples)
+massSamples = np.exp(logMassSamples)
+
+logPMass = log_n_approx(massSamples,redshift)
+
+logPSample = np.array([t.logpdf(lms,df, loc = invLogLam(logL0_true, a_true, b_true, B_l_true, redshift, lr), scale = sigma_mass)\
+                     for lms, lr in izip(logMassSamples, logRichness)])
+
+
 def log_liklihood(logL0, a,b, B_l, sigma, z, logRich):
-    sigma_mass = 1 #TODO idk what this should be; i suppose it's my discretion, or some relation to
-    logL = 0
-    #TODO Vectorize furhter?
 
-    for lr in logRich:
-        #use truths as really really good guess. Can relax later.
-        logMassSamples = invLogLamSample(logL0_true, a_true, b_true, B_l_true,sigma_mass, z, lr)
-        massSamples = np.exp(logMassSamples)
-        logPRich = norm.logpdf(lr, loc =logLam(logL0, a, b, B_l, z, massSamples), scale = sigma)
-        logPMass = log_n_approx(massSamples,z)
-        logPMass_sample = norm.logpdf(logMassSamples, loc = invLogLam(logL0_true, a_true, b_true, B_l_true, z, lr), scale = sigma_mass)
+    logPRich = np.array([norm.logpdf(lr, loc =logLam(logL0, a, b, B_l, z, ms), scale = sigma)\
+                         for lr, ms in izip(logRich, massSamples)])
 
-        logL+= logsumexp(logPRich+logPMass-logPMass_sample)
+    logL_k = logsumexp(logPRich+logPMass-logPSample, axis = 1) - np.log(nSamples)#mean of weights
 
-    return logL
+    return np.sum(logL_k)
 
 def log_posterior(theta,z, logRich):
     #print theta
     logL0,a,b, B_l, sigma = theta[:]
+    b, B_l = b_true, B_l_true
     p = log_prior(logL0, a,b, B_l, sigma)
     if np.isfinite(p):
         p+=log_liklihood(logL0,a,b, B_l, sigma, z, logRich)
@@ -232,4 +241,9 @@ print '\tMCMC\tTrue'
 for label, val, truth in zip(labels, MAP, [logL0_true, a_true, b_true, B_l_true, sigma_l_true]):
     print '%s:\t%.3f\t%.3f'%(label, val, truth)
 
-np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
+
+from corner import corner
+corner(chain, labels = labels, truths = MAP)
+from matplotlib import pyplot as plt
+plt.show()
+#np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
