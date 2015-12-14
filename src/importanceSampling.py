@@ -25,7 +25,7 @@ parser.add_argument('nCores', metavar = 'nCores', type = int, help=\
 parser.add_argument('nData', metavar = 'nData', type = int, help=\
                     'Number of mock data points to draw. ')
 
-parser.add_argument('nSamples', metavar = 'nCores', type = int, help=\
+parser.add_argument('nSamples', metavar = 'nSamples', type = int, help=\
                     'Number of samples to draw during importance sampling.')
 
 #parser.add_argument('--noDisplay', dest = 'noDisplay', action = 'store_true', help =\
@@ -48,6 +48,7 @@ from multiprocessing import cpu_count
 maxCores = cpu_count()
 if nCores>maxCores:
     print 'WARNING: Specified number of cores greater than total available.'
+    print 'nCores = %d'%maxCores
     nCores = maxCores
 
 import numpy as np
@@ -165,16 +166,17 @@ def invLogLam(logL0, a, b, B_l, z, logRich):
     return np.log(M_piv)+(logRich-logL0-B_l*np.log((1+z)/1.3))/A_l
 #TODO Make this one synonymous with it non-inverse version
 #TODO Consider checking if logRich is a vector or a number, and acting accodingly.
+sigma_mass = 1 #TODO idk what this should be; i suppose it's my discretion
+df = 1
+
 def invLogLamSample(logLam0, a, b, B_lam,sigma_mass, z,logRich, size = 100):
     #NOTE Returns ln(M), not log10(M)! This is how the formula is defined!
     mu = invLogLam(logLam0, a, b, B_lam, z, logRich)
     if sigma_mass == 0:
         return mu
-    return np.array([norm.rvs(loc = m, scale = sigma_mass, size =  size)\
+    return np.array([t.rvs(df, loc = m, scale = sigma_mass, size =  size)\
                     for m in mu])#(logRich.shape[0], size)
 
-sigma_mass = 1 #TODO idk what this should be; i suppose it's my discretion
-df = 1
 #draw one set of samples, rather than re-drawing each cycle
 #use truths as really really good guess. Can relax later.
 logMassSamples = invLogLamSample(logL0_true, a_true, b_true, B_l_true,sigma_mass, redshift, logRichness, size = nSamples)
@@ -198,7 +200,7 @@ def log_liklihood(logL0, a,b, B_l, sigma, z, logRich):
 def log_posterior(theta,z, logRich):
     #print theta
     logL0,a,b, B_l, sigma = theta[:]
-    b, B_l = b_true, B_l_true
+    b, B_l = b_true, B_l_true#no z information
     p = log_prior(logL0, a,b, B_l, sigma)
     if np.isfinite(p):
         p+=log_liklihood(logL0,a,b, B_l, sigma, z, logRich)
@@ -223,7 +225,7 @@ for row in pos0:
     row[4] = gamma.rvs(sigma_a, scale = sigma_b)
 
 sampler = mc.EnsembleSampler(nWalkers, nDim, log_posterior, args=[redshift, logRichness],threads = nCores)
-nburn = int(nSteps)/10
+nburn = int(nSteps)/5
 
 sampler.run_mcmc(pos0, nSteps)
 
@@ -234,16 +236,11 @@ chain = sampler.chain[:,nburn:, :].reshape((-1, nDim))
 
 del(sampler)
 
-MAP = chain[:, :5].mean(axis = 0)
+MAP = chain.mean(axis = 0)
 print MAP
 labels = ['logL0', 'a', 'b','B_l','sigma']
 print '\tMCMC\tTrue'
 for label, val, truth in zip(labels, MAP, [logL0_true, a_true, b_true, B_l_true, sigma_l_true]):
     print '%s:\t%.3f\t%.3f'%(label, val, truth)
 
-
-from corner import corner
-corner(chain, labels = labels, truths = MAP)
-from matplotlib import pyplot as plt
-plt.show()
-#np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
+np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
