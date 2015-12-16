@@ -226,7 +226,7 @@ for row in pos0:
     row[4] = gamma.rvs(sigma_a, scale = sigma_b)
 
 sampler = mc.EnsembleSampler(nWalkers, nDim, log_posterior, args=[redshift, logRichness],threads = nCores)
-nburn = int(nSteps)/5
+nburn = 2*2*int(nSteps)/5
 
 sampler.run_mcmc(pos0, nSteps)
 
@@ -243,5 +243,5 @@ labels = ['logL0', 'a', 'b','B_l','sigma']
 print '\tMCMC\tTrue'
 for label, val, truth in zip(labels, MAP, [logL0_true, a_true, b_true, B_l_true, sigma_l_true]):
     print '%s:\t%.3f\t%.3f'%(label, val, truth)
-
+print 'Saving Chain'
 np.savetxt('is_chain_%dw_%ds.gz'%(nWalkers, nSteps), chain)
