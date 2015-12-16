@@ -166,7 +166,7 @@ def invLogLam(logL0, a, b, B_l, z, logRich):
     return np.log(M_piv)+(logRich-logL0-B_l*np.log((1+z)/1.3))/A_l
 #TODO Make this one synonymous with it non-inverse version
 #TODO Consider checking if logRich is a vector or a number, and acting accodingly.
-sigma_mass = 1 #TODO idk what this should be; i suppose it's my discretion
+sigma_mass = .1 #TODO idk what this should be; i suppose it's my discretion
 df = 1
 
 def invLogLamSample(logLam0, a, b, B_lam,sigma_mass, z,logRich, size = 100):
@@ -183,6 +183,7 @@ logMassSamples = invLogLamSample(logL0_true, a_true, b_true, B_l_true,sigma_mass
 massSamples = np.exp(logMassSamples)
 
 logPMass = log_n_approx(massSamples,redshift)
+logPMass[massSamples<Mmin] = -np.inf
 
 logPSample = np.array([t.logpdf(lms,df, loc = invLogLam(logL0_true, a_true, b_true, B_l_true, redshift, lr), scale = sigma_mass)\
                      for lms, lr in izip(logMassSamples, logRichness)])
